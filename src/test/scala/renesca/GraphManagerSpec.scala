@@ -49,23 +49,22 @@ trait HttpMockServer extends BeforeAllAfterAll {
     mockServer = new HttpMockServerStandalone(randomPorts.get(0), randomPorts.get(1))
     mockServer.start()
 
-    copyWarFromDependency(
+    copyResourceFromDependency(
       classLoader = mockServer.getClass.getClassLoader,
-      jarResource = "wars/mockserver.war",
-      war = "target/mockserver.war")
+      resourceName = "wars/mockserver.war",
+      outputFile = new File("target/mockserver.war"))
 
     mockServer.deploy("target/mockserver.war")
   }
 
-  def copyWarFromDependency(classLoader: ClassLoader, jarResource: String, war: String) {
-    val warFile: File = new File(war)
-    if (warFile.exists()) warFile.delete()
+  def copyResourceFromDependency(classLoader: ClassLoader, resourceName: String, outputFile: File) {
+    if (outputFile.exists()) outputFile.delete()
 
     var inputStream: InputStream = null
     var outputStream: OutputStream = null
     try {
-      inputStream = classLoader.getResourceAsStream(jarResource)
-      outputStream = new FileOutputStream(warFile)
+      inputStream = classLoader.getResourceAsStream(resourceName)
+      outputStream = new FileOutputStream(outputFile)
       IOUtils.copy(inputStream, outputStream)
       inputStream.close()
       outputStream.close()
@@ -73,9 +72,8 @@ trait HttpMockServer extends BeforeAllAfterAll {
       IOUtils.closeQuietly(inputStream)
       IOUtils.closeQuietly(outputStream)
     }
-
-
   }
+
   override def afterAll {
     mockServer.stop()
   }
@@ -113,5 +111,4 @@ class HttpMock(val mockService: MockService) extends Scope with After {
 
   def requestUrl = mockService.getRequestUrl
 
-  def withMock(value: Nothing) = ???
 }
