@@ -1,21 +1,22 @@
 package renesca
 
+import java.io.{File, FileOutputStream, InputStream, OutputStream}
+
+import com.github.httpmock.builder.RequestBuilder._
+import com.github.httpmock.builder.ResponseBuilder._
 import com.github.httpmock.dto.RequestDto
 import com.github.httpmock.rules.{MockService, MockVerifyException, Stubbing}
 import com.github.httpmock.times.Times
 import com.github.httpmock.{HttpMockServerStandalone, PortUtil}
-import org.specs2.mutable.Specification
-import org.specs2.specification.{Step, Fragments, BeforeAfter, BeforeAfterContextExample}
+import org.apache.commons.io.IOUtils
+import org.specs2.execute.{Result, AsResult}
+import org.specs2.mutable
+import org.specs2.specification._
 
-import scala.collection.JavaConversions._
-import com.github.httpmock.builder.RequestBuilder._
-import com.github.httpmock.builder.ResponseBuilder._
-
-class GraphManagerSpec extends Specification with HttpMock {
+class GraphManagerSpec extends mutable.Specification with HttpMockServer {
   "GraphManager" should {
     // TODO: do everything in integration test instead.
-    "some test" in {
-      println("test")
+    "some test" in new HttpMock(this) {
       when(request().get("/some/url").build()).thenRespond(response().build())
       true must beTrue
     }
@@ -23,42 +24,80 @@ class GraphManagerSpec extends Specification with HttpMock {
 
 }
 
-trait BeforeAllAfterAll extends Specification {
-  override def map(fragments: =>Fragments) =
+trait BeforeAllAfterAll extends mutable.Specification {
+  override def map(fragments: => Fragments) =
     Step(beforeAll) ^ fragments ^ Step(afterAll)
 
   protected def beforeAll()
+
   protected def afterAll()
 }
 
 trait HttpMockServer extends BeforeAllAfterAll {
-  var mockServer : HttpMockServerStandalone = null
+  var mockServer: HttpMockServerStandalone = null
 
-  override def beforeAll {
-    val randomPorts: List[Integer] = PortUtil.getRandomPorts(2).toList
-    mockServer = new HttpMockServerStandalone(randomPorts.get(0), randomPorts.get(1))
-    mockServer.start()
+  def createMock() = {
+    val mockService = new MockService(baseUri, "/mockserver")
+    mockService.create()
+    mockService
   }
 
+  def baseUri = s"http://localhost:${port}"
+
+  override def beforeAll {
+    val randomPorts = PortUtil.getRandomPorts(2)
+    mockServer = new HttpMockServerStandalone(randomPorts.get(0), randomPorts.get(1))
+    mockServer.start()
+
+    copyWarFromDependency(
+      classLoader = mockServer.getClass.getClassLoader,
+      jarResource = "wars/mockserver.war",
+      war = "target/mockserver.war")
+
+    mockServer.deploy("target/mockserver.war")
+  }
+
+  def copyWarFromDependency(classLoader: ClassLoader, jarResource: String, war: String) {
+    val warFile: File = new File(war)
+    if (warFile.exists()) warFile.delete()
+
+    var inputStream: InputStream = null
+    var outputStream: OutputStream = null
+    try {
+      inputStream = classLoader.getResourceAsStream(jarResource)
+      outputStream = new FileOutputStream(warFile)
+      IOUtils.copy(inputStream, outputStream)
+      inputStream.close()
+      outputStream.close()
+    } finally {
+      IOUtils.closeQuietly(inputStream)
+      IOUtils.closeQuietly(outputStream)
+    }
+
+
+  }
   override def afterAll {
     mockServer.stop()
   }
+
+  def port = mockServer.getHttpPort
 }
 
-trait HttpMock extends HttpMockServer with BeforeAfter {
-  val MOCK_SERVER_CONTEXT = "/mockserver"
-  var mockService : MockService = null
+class HttpMock(val mockService: MockService) extends Scope with After {
 
-  override def before {
-    mockService = new MockService(baseUri, MOCK_SERVER_CONTEXT);
-    mockService.create()
+  def this(mockServer: HttpMockServer) {
+    this(mockServer.createMock())
   }
 
-  override def after {
+  override def after: Unit = {
+    deleteMock()
+  }
+
+  def deleteMock() {
     mockService.delete()
   }
 
-  def when(request : RequestDto) = new Stubbing(mockService, request)
+  def when(request: RequestDto) = new Stubbing(mockService, request)
 
   def verify(request: RequestDto, times: Times) {
     val numberOfCalls = getNumberOfCalls(request)
@@ -69,8 +108,10 @@ trait HttpMock extends HttpMockServer with BeforeAfter {
   }
 
   private def getNumberOfCalls(request: RequestDto) = verifyResponse(request).getTimes
+
   private def verifyResponse(request: RequestDto) = mockService.verify(request)
-  private def baseUri: String = s"http://localhost:$port"
-  def port = mockServer.getHttpPort
+
   def requestUrl = mockService.getRequestUrl
+
+  def withMock(value: Nothing) = ???
 }
