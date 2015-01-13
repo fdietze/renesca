@@ -1,17 +1,21 @@
 package renesca
 
-import java.io.{File, FileOutputStream, InputStream, OutputStream}
+import java.io._
+import java.net.Socket
+import java.util.concurrent.TimeUnit
 
 import com.github.httpmock.builder.RequestBuilder._
 import com.github.httpmock.builder.ResponseBuilder._
 import com.github.httpmock.dto.RequestDto
 import com.github.httpmock.rules.{MockService, MockVerifyException, Stubbing}
 import com.github.httpmock.times.Times
-import com.github.httpmock.{HttpMockServerStandalone, PortUtil}
-import org.apache.commons.io.IOUtils
-import org.specs2.execute.{Result, AsResult}
+import com.github.httpmock.{ExecRunner, PortUtil}
+import com.jayway.awaitility.scala.AwaitilitySupport
+import com.jayway.awaitility.{Awaitility, Duration}
+import com.jayway.restassured.RestAssured
 import org.specs2.mutable
 import org.specs2.specification._
+
 
 class GraphManagerSpec extends mutable.Specification with HttpMockServer {
   "GraphManager" should {
@@ -33,8 +37,10 @@ trait BeforeAllAfterAll extends mutable.Specification {
   protected def afterAll()
 }
 
-trait HttpMockServer extends BeforeAllAfterAll {
-  var mockServer: HttpMockServerStandalone = null
+trait HttpMockServer extends BeforeAllAfterAll with AwaitilitySupport {
+  var runner: ExecRunner = null
+  var startPort: String = ""
+  var stopPort: String = ""
 
   def createMock() = {
     val mockService = new MockService(baseUri, "/mockserver")
@@ -45,40 +51,39 @@ trait HttpMockServer extends BeforeAllAfterAll {
   def baseUri = s"http://localhost:${port}"
 
   override def beforeAll {
-    val randomPorts = PortUtil.getRandomPorts(2)
-    mockServer = new HttpMockServerStandalone(randomPorts.get(0), randomPorts.get(1))
-    mockServer.start()
+    val ports = PortUtil.getRandomPorts(3)
+    startPort = ports.get(0).toString
+    stopPort = ports.get(1).toString
+    val ajpPort = ports.get(2).toString
+    runner = new ExecRunner(ExecRunner.readConfiguration(), startPort, stopPort, ajpPort)
+    runner.start()
 
-    copyResourceFromDependency(
-      classLoader = mockServer.getClass.getClassLoader,
-      resourceName = "wars/mockserver.war",
-      outputFile = new File("target/mockserver.war"))
-
-    mockServer.deploy("target/mockserver.war")
+    waitUntilServerIsStarted
   }
 
-  def copyResourceFromDependency(classLoader: ClassLoader, resourceName: String, outputFile: File) {
-    if (outputFile.exists()) outputFile.delete()
-
-    var inputStream: InputStream = null
-    var outputStream: OutputStream = null
+  def isServerStarted() = {
     try {
-      inputStream = classLoader.getResourceAsStream(resourceName)
-      outputStream = new FileOutputStream(outputFile)
-      IOUtils.copy(inputStream, outputStream)
-      inputStream.close()
-      outputStream.close()
-    } finally {
-      IOUtils.closeQuietly(inputStream)
-      IOUtils.closeQuietly(outputStream)
+      RestAssured.given().baseUri(baseUri).basePath("/mockserver").get("/").getStatusCode == 200
+    } catch {
+      case e: Exception =>
+        false
     }
   }
 
-  override def afterAll {
-    mockServer.stop()
+
+  def waitUntilServerIsStarted: Unit = {
+    Awaitility.await() atMost(new Duration(60, TimeUnit.SECONDS)) pollDelay (Duration.ONE_SECOND) until { isServerStarted }
   }
 
-  def port = mockServer.getHttpPort
+  override def afterAll {
+    val s = new Socket("localhost", Integer.parseInt(stopPort))
+    val out = new PrintStream(s.getOutputStream)
+    out.print("SHUTDOWN")
+    out.flush()
+    s.close()
+  }
+
+  def port = startPort
 }
 
 class HttpMock(val mockService: MockService) extends Scope with After {
