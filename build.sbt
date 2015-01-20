@@ -23,12 +23,20 @@ libraryDependencies ++= Seq(
 
 
 // Scoverage
-scalacOptions in Test ++= Seq("-Yrangepos")
+scalacOptions in UnitTest ++= Seq("-Yrangepos")
 
-// Integration tests
-unmanagedSourceDirectories in DbTest <<= (baseDirectory in DbTest)(base =>  Seq(base / "src/test-integration"))
+// test definitions
+unmanagedSourceDirectories in DbTest := Seq(baseDirectory.value / "src/test-integration")
 
-parallelExecution in IntegrationTest := false
+unmanagedSourceDirectories in UnitTest := Seq(baseDirectory.value / "src/test")
+
+unmanagedSourceDirectories in Test += baseDirectory.value / "src/test-integration"
+
+parallelExecution in DbTest := false
+
+parallelExecution in UnitTest := true
+
+parallelExecution in Test := false
 
 // publishing
 pgpSecretRing := file("local.secring.gpg")
