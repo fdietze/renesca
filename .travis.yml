@@ -13,7 +13,7 @@ jdk:
 - openjdk6
 - openjdk7
 script:
-- sbt ++$TRAVIS_SCALA_VERSION clean coverage unit:test
+- sbt ++$TRAVIS_SCALA_VERSION clean coverage test
 - sbt ++$TRAVIS_SCALA_VERSION db:test # integration tests need a running neo4j instance
 - rm ~/.sbt/boot/scala-*/org.scala-sbt/sbt/*/sbt.components.lock ~/.sbt/boot/sbt.boot.lock
 after_success:
