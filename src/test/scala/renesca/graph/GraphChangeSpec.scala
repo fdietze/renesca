@@ -57,7 +57,7 @@ class GraphChangeSpec extends Specification with Mockito {
     "emit change when adding node to nodes" in {
       val graph = Graph.empty
 
-      graph.nodes += Node.local
+      graph.nodes += Node()
 
       val nodeId = graph.nodes.head.id
       graph.nodes.localChanges must contain(exactly(
@@ -108,7 +108,7 @@ class GraphChangeSpec extends Specification with Mockito {
 
     "emit change when adding local node with properties/labels" in {
       val graph = Graph.empty
-      val node = Node.local
+      val node = Node()
 
       node.properties("ciao") = "mit V"
       node.labels += "boom"
@@ -123,7 +123,7 @@ class GraphChangeSpec extends Specification with Mockito {
 
     "emit change when adding local node and then properties/labels" in {
       val graph = Graph.empty
-      val node = Node.local
+      val node = Node()
 
       graph.nodes += node
       node.properties("ciao") = "mit V"
@@ -140,7 +140,7 @@ class GraphChangeSpec extends Specification with Mockito {
       val node1 = Node(1)
       val node2 = Node(2)
       val graph = Graph(List(node1, node2))
-      val relation = Relation.local(node1, node2, "nagut")
+      val relation = Relation(start = node1, end = node2, relationType = "nagut")
 
       relation.properties("ciao") = "mit V"
       graph.relations += relation
@@ -155,7 +155,7 @@ class GraphChangeSpec extends Specification with Mockito {
       val node1 = Node(1)
       val node2 = Node(2)
       val graph = Graph(List(node1, node2))
-      val relation = Relation.local(node1, node2, "nagut")
+      val relation = Relation(start = node1, end = node2, relationType = "nagut")
 
       graph.relations += relation
       relation.properties("ciao") = "mit V"
