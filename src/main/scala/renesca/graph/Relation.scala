@@ -13,14 +13,15 @@ object RelationType {
 case class RelationType(name:String) extends NonBacktickName
 
 object Relation {
-  def apply(id:Id, start:Node, end:Node, relationType:RelationType, properties:PropertyMap = Map.empty) = {
-    val relationProperties = new Properties(id, RelationSetProperty, RelationRemoveProperty, mutable.HashMap.empty[PropertyKey, PropertyValue] ++ properties)
-    new Relation(id, start, end, relationType, relationProperties)
-  }
-  def local(start:Node, end:Node, relationType:RelationType, properties:PropertyMap = Map.empty) = {
+  private[renesca] def apply(id:Id = null, start:Node, end:Node, relationType:RelationType, properties:PropertyMap = Map.empty):Relation = {
+    if(id == null) { // construct a local Relation with negative id
     val relation = apply(Id.nextId(), start, end, relationType)
-    relation.properties ++= properties
-    relation
+      relation.properties ++= properties
+      relation
+    } else { // construct a Relation which exists in the database
+    val relationProperties = new Properties(id, RelationSetProperty, RelationRemoveProperty, mutable.HashMap.empty[PropertyKey, PropertyValue] ++ properties)
+      new Relation(id, start, end, relationType, relationProperties)
+    }
   }
 }
 

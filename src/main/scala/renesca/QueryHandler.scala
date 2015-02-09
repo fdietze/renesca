@@ -182,7 +182,7 @@ class Transaction extends QueryHandler {
 
       invalidate()
     }
-    
+
     def queryGraph(query:Query):Graph = queryGraphs(query).head
     def queryTable(query:Query):Table = queryTables(query).head
     def queryGraphs(queries:Query*):Seq[Graph] = {
